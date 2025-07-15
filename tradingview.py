@@ -178,3 +178,8 @@ class tradingview:
         except Exception as e:
             logging.error(f"Error removing access: {e}")
             return {"error": "Error removing access"}
+
+            return access_details
+        except Exception as e:
+            logging.error(f"Error removing access: {e}")
+            return {"error": "Error removing access"}
