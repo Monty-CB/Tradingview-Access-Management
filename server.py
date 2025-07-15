@@ -1,65 +1,54 @@
-from flask import Flask, request
+from fastapi import FastAPI
 from tradingview import tradingview
+from pydantic import BaseModel
 import json
-#from threading import Thread
-app = Flask('')
-@app.route('/validate/<username>', methods=['GET'])
-def validate(username):
-  try:
-    print(username)
-    tv = tradingview()
-    response = tv.validate_username(username)
-    return json.dumps(response), 200, {'Content-Type': 'application/json; charset=utf-8'}
-  except Exception as e:
-    print("[X] Exception Occured : ", e)
-    failureResponse = {
-      'errorMessage':'Unknown Exception Occurred'
-    }
-    return json.dumps(failureResponse), 500, {'Content-Type': 'application/json; charset=utf-8'}
 
-@app.route('/access/<username>', methods=['GET', 'POST', 'DELETE'])
-def access(username):
-  try:
-    jsonPayload = request.json
-    pine_ids = jsonPayload.get('pine_ids')
-    print(jsonPayload)
-    print(pine_ids)
-    tv = tradingview()
-    accessList = []
-    for pine_id in pine_ids:
-      access = tv.get_access_details(username, pine_id)
-      accessList = accessList + [access]
-      
-    if request.method == 'POST':
-      duration = jsonPayload.get('duration')
-      dNumber = int(duration[:-1])
-      dType = duration[-1:]
-      for access in accessList:
-        tv.add_access(access, dType, dNumber)
+# Crea la aplicación FastAPI
+app = FastAPI()
 
-    if request.method == 'DELETE':
-      for access in accessList:
-        tv.remove_access(access)
-    return json.dumps(accessList), 200, {'Content-Type': 'application/json; charset=utf-8'}
+# Definir el modelo para recibir los datos en el endpoint de /access
+class AccessRequest(BaseModel):
+    pine_ids: list
+    duration: str
+
+@app.get("/validate/{username}")
+async def validate(username: str):
+    try:
+        print(username)
+        tv = tradingview()
+        response = tv.validate_username(username)
+        return response
+    except Exception as e:
+        print("[X] Exception Occurred:", e)
+        return {"errorMessage": "Unknown Exception Occurred"}
+
+@app.api_route("/access/{username}", methods=["GET", "POST", "DELETE"])
+async def access(username: str, request: AccessRequest):
+    try:
+        pine_ids = request.pine_ids
+        print(pine_ids)
+        tv = tradingview()
+        accessList = []
+        for pine_id in pine_ids:
+            access = tv.get_access_details(username, pine_id)
+            accessList.append(access)
         
-  except Exception as e:
-    print("[X] Exception Occured : ", e)
-    failureResponse = {
-      'errorMessage':'Unknown Exception Occurred'
-    }
-    return json.dumps(failureResponse), 500, {'Content-Type': 'application/json; charset=utf-8'}
+        if request.method == 'POST':
+            duration = request.duration
+            dNumber = int(duration[:-1])
+            dType = duration[-1:]
+            for access in accessList:
+                tv.add_access(access, dType, dNumber)
 
-@app.route('/')
-def main():
-  return 'Your bot is alive!'
+        if request.method == 'DELETE':
+            for access in accessList:
+                tv.remove_access(access)
+        
+        return accessList
+    except Exception as e:
+        print("[X] Exception Occurred:", e)
+        return {"errorMessage": "Unknown Exception Occurred"}
 
-# def run():
-#   app.run(host='0.0.0.0', port=5000)
-
-
-# def start_server_async():
-#   server = Thread(target=run)
-#   server.start()
-
-def start_server():
-  app.run(host='0.0.0.0', port=5000)
+@app.get("/")
+async def main():
+    return "Your bot is alive!"
